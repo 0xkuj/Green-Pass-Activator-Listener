@@ -1,7 +1,5 @@
-/* How to Hook with Logos
-Hooks are written with syntax similar to that of an Objective-C @implementation.
-You don't need to #include <substrate.h>, it will be done automatically, as will
-the generation of a class list and an automatic constructor. */
+/* v1.0 This tweak allows you to pick a favorite photo and display it anywhere on your device using activator gesture */
+/* features in the future: multiple photos selection, video support, draggin/resizing the imageview */
 #import "GPActivator.h"
 @interface SpringBoard
 -(void)windowForPrompts;
@@ -27,7 +25,6 @@ UIWindow* _alertWindow;
 UIImageView* gpMainImageView;
 - (void)applicationDidFinishLaunching:(id)application {
 	%orig;
-
 	if (!isEnabled)
 		return;
 
@@ -41,7 +38,10 @@ UIImageView* gpMainImageView;
 
 	NSString* const imagesDomain = @"com.0xkuj.greenpassprefs";
 	NSData* data = [[NSUserDefaults standardUserDefaults] objectForKey:@"backgroundImage" inDomain:imagesDomain];
-
+	if (data == nil) {
+		NSLog(@"No image was assigned!");
+		return;
+	}
 	UIImage* bgImage = [UIImage imageWithData:data];
 	UIImage* imageResized = [self scaleImage:bgImage toSize:CGSizeMake([[UIScreen mainScreen] bounds].size.width-30, [[UIScreen mainScreen] bounds].size.height-30)];
 	gpMainImageView = [[UIImageView alloc] initWithImage:imageResized];
@@ -49,7 +49,7 @@ UIImageView* gpMainImageView;
 }
 
 %new
-- (UIImage*) scaleImage:(UIImage*)image toSize:(CGSize)newSize {
+- (UIImage*)scaleImage:(UIImage*)image toSize:(CGSize)newSize {
 
     CGSize imageSize = image.size;
     CGFloat newWidth  = newSize.width  / image.size.width;
@@ -63,11 +63,8 @@ UIImageView* gpMainImageView;
     }
 
     CGRect rect = CGRectMake(0, 0, newImgSize.width, newImgSize.height);
-
     UIGraphicsBeginImageContextWithOptions(newImgSize, false, 0.0);
-
     [image drawInRect:rect];
-
     UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
 
@@ -96,8 +93,6 @@ UIImageView* gpMainImageView;
                } completion:NULL];
     	} completion:^(BOOL finished) { 	}
 	];
-
-	//_alertWindow.rootViewController.view.frame = CGRectMake(15,15,0,0);
 	UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(fadeBlurAndView:)];
 	[_alertWindow addGestureRecognizer:tapGestureRecognizer];
 }
