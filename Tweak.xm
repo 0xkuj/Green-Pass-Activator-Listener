@@ -5,10 +5,34 @@
 -(void)windowForPrompts;
 -(void)fadeBlurAndView:(id)sender;
 -(UIImage*) scaleImage:(UIImage*)image toSize:(CGSize)newSize;
+//-(void)moveImageWithGesture:(UIPanGestureRecognizer *)panGesture;
+//- (void)pinchGestureDidFire:(UIPinchGestureRecognizer *)pinch;
+- (void)moveImage:(UIPanGestureRecognizer *)panRecognizer;
+- (void)rotateImage:(UIRotationGestureRecognizer *)rotationGestureRecognizer;
+- (void)pinchImage:(UIPinchGestureRecognizer *)pinchRecognizer;
 @end
-
+float globalLeftX = 0, globalRightX = 0, globalUpperY = 0, globalLowerY = 0;
 @interface NSUserDefaults ()
 -(id)objectForKey:(id)arg1 inDomain:(id)arg2 ;
+@end
+
+@interface UIView ()
+- (CGPoint)locationInView:(UIView *)view;
+@end
+
+@interface WindowTouchRecognizerSubview : UIWindow
+@end
+
+@implementation WindowTouchRecognizerSubview
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+	//touched in view
+	if (point.x > globalLeftX && point.x < globalRightX && point.y > globalUpperY && point.y < globalLowerY) {
+		return YES;
+	}
+    else {
+		return NO;
+	}
+}
 @end
 
 BOOL isEnabled = FALSE;
@@ -18,6 +42,13 @@ static void loadPrefs() {
 	#define GREEN_PASS_PLIST @"/var/mobile/Library/Preferences/com.0xkuj.greenpassprefs.plist"
 	NSMutableDictionary* mainPreferenceDict = [[NSMutableDictionary alloc] initWithContentsOfFile:GREEN_PASS_PLIST];
 	isEnabled = [mainPreferenceDict objectForKey:@"isEnabled"] ? [[mainPreferenceDict objectForKey:@"isEnabled"] boolValue] : YES;
+}
+static void updateGlobalCords(float leftx, float rightx,float upy,float lowy) {
+	#define INITIAL_IMAGE_OFFSET 15
+	globalLeftX = leftx+INITIAL_IMAGE_OFFSET;
+	globalRightX = rightx+INITIAL_IMAGE_OFFSET;
+	globalUpperY = upy+INITIAL_IMAGE_OFFSET;
+	globalLowerY = lowy+INITIAL_IMAGE_OFFSET;
 }
 
 %hook SpringBoard
@@ -73,11 +104,11 @@ UIImageView* gpMainImageView;
 
 %new
 -(void)windowForPrompts {
-	_alertWindow= [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+	_alertWindow= [[WindowTouchRecognizerSubview alloc] initWithFrame:[UIScreen mainScreen].bounds];
     _alertWindow.rootViewController = [UIViewController new];
     _alertWindow.windowLevel = UIWindowLevelAlert+1;
     _alertWindow.hidden = NO;
-    _alertWindow.tintColor = [[UIWindow valueForKey:@"keyWindow"] tintColor];
+    _alertWindow.tintColor = [[WindowTouchRecognizerSubview valueForKey:@"keyWindow"] tintColor];
 	gpMainImageView.alpha = 0;
 	gpMainImageView.clipsToBounds = YES;
 	gpMainImageView.layer.cornerRadius = 15.0f;
@@ -94,7 +125,21 @@ UIImageView* gpMainImageView;
     	} completion:^(BOOL finished) { 	}
 	];
 	UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(fadeBlurAndView:)];
-	[_alertWindow addGestureRecognizer:tapGestureRecognizer];
+	gpMainImageView.userInteractionEnabled = YES;
+	[gpMainImageView addGestureRecognizer:tapGestureRecognizer];
+
+	UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveImage:)];
+	UIRotationGestureRecognizer *rotationGesture = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotateImage:)];
+	UIPinchGestureRecognizer *pinchGesture = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchImage:)];
+
+	[gpMainImageView addGestureRecognizer:panGesture];
+	[gpMainImageView addGestureRecognizer:rotationGesture];
+	[gpMainImageView addGestureRecognizer:pinchGesture];
+
+	updateGlobalCords(gpMainImageView.frame.origin.x,gpMainImageView.frame.origin.x + gpMainImageView.frame.size.width,
+						gpMainImageView.frame.origin.y, gpMainImageView.frame.origin.y + gpMainImageView.frame.size.height);
+
+
 }
 
 %new
@@ -115,7 +160,54 @@ UIImageView* gpMainImageView;
 	});
 	 
 }
+
+%new
+- (void)pinchImage:(UIPinchGestureRecognizer *)pinchRecognizer
+{
+    UIGestureRecognizerState state = [pinchRecognizer state];
+
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGFloat scale = [pinchRecognizer scale];
+        [pinchRecognizer.view setTransform:CGAffineTransformScale(pinchRecognizer.view.transform, scale, scale)];
+        [pinchRecognizer setScale:1.0];
+    }
+	updateGlobalCords(pinchRecognizer.view.frame.origin.x,pinchRecognizer.view.frame.origin.x + pinchRecognizer.view.frame.size.width,
+						pinchRecognizer.view.frame.origin.y, pinchRecognizer.view.frame.origin.y + pinchRecognizer.view.frame.size.height);
+}
+
+%new
+- (void)rotateImage:(UIRotationGestureRecognizer *)rotationGestureRecognizer {
+
+    UIGestureRecognizerState state = [rotationGestureRecognizer state];
+
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGFloat rotation = [rotationGestureRecognizer rotation];
+        [rotationGestureRecognizer.view setTransform:CGAffineTransformRotate(rotationGestureRecognizer.view.transform, rotation)];
+        [rotationGestureRecognizer setRotation:0];
+    }
+		updateGlobalCords(rotationGestureRecognizer.view.frame.origin.x,rotationGestureRecognizer.view.frame.origin.x + rotationGestureRecognizer.view.frame.size.width,
+						rotationGestureRecognizer.view.frame.origin.y, rotationGestureRecognizer.view.frame.origin.y + rotationGestureRecognizer.view.frame.size.height);
+}
+
+%new
+- (void)moveImage:(UIPanGestureRecognizer *)panRecognizer {
+
+    UIGestureRecognizerState state = [panRecognizer state];
+
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGPoint translation = [panRecognizer translationInView:panRecognizer.view];
+        [panRecognizer.view setTransform:CGAffineTransformTranslate(panRecognizer.view.transform, translation.x, translation.y)];
+        [panRecognizer setTranslation:CGPointZero inView:panRecognizer.view];
+    }
+	updateGlobalCords(panRecognizer.view.frame.origin.x, panRecognizer.view.frame.origin.x + panRecognizer.view.frame.size.width,
+						panRecognizer.view.frame.origin.y,panRecognizer.view.frame.origin.y + panRecognizer.view.frame.size.height);
+}
 %end
+
+
 
 %ctor {
 	loadPrefs();

@@ -2,7 +2,7 @@ Package: com.0xkuj.greenpass
 Name: Green Pass
 Version: 1.0
 Architecture: iphoneos-arm
-Description: An awesome MobileSubstrate tweak!
+Description: A tweak to show an image using activator gestures
 Maintainer: 0xkuj
 Author: 0xkuj
 Section: Tweaks
