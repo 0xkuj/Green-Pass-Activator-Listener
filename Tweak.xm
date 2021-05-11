@@ -10,23 +10,26 @@
 - (void)moveImage:(UIPanGestureRecognizer *)panRecognizer;
 - (void)rotateImage:(UIRotationGestureRecognizer *)rotationGestureRecognizer;
 - (void)pinchImage:(UIPinchGestureRecognizer *)pinchRecognizer;
+-(void)buttonPressedAction:(id)sender;
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info;
+-(void)activatorGP;
 @end
 float globalLeftX = 0, globalRightX = 0, globalUpperY = 0, globalLowerY = 0;
+UIButton *button;
 @interface NSUserDefaults ()
 -(id)objectForKey:(id)arg1 inDomain:(id)arg2 ;
 @end
 
-@interface UIView ()
-- (CGPoint)locationInView:(UIView *)view;
-@end
-
+/* created for recognizing touches in view inside the window holding it */
 @interface WindowTouchRecognizerSubview : UIWindow
 @end
 
 @implementation WindowTouchRecognizerSubview
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-	//touched in view
-	if (point.x > globalLeftX && point.x < globalRightX && point.y > globalUpperY && point.y < globalLowerY) {
+	//touched in view or in button
+	NSLog(@"omriku button: x: %f, y: %f", button.frame.origin.x, button.frame.origin.y);
+	if ((point.x > globalLeftX && point.x < globalRightX && point.y > globalUpperY && point.y < globalLowerY)
+	    || (point.x > button.frame.origin.x && point.x < button.frame.origin.x + 45 && point.y > button.frame.origin.y && point.y < button.frame.origin.y+45) ) {
 		return YES;
 	}
     else {
@@ -36,10 +39,10 @@ float globalLeftX = 0, globalRightX = 0, globalUpperY = 0, globalLowerY = 0;
 @end
 
 BOOL isEnabled = FALSE;
-
+#define GREEN_PASS_PLIST @"/var/mobile/Library/Preferences/com.0xkuj.greenpassprefs.plist"
 /* Load preferences after change or after respring */
 static void loadPrefs() {
-	#define GREEN_PASS_PLIST @"/var/mobile/Library/Preferences/com.0xkuj.greenpassprefs.plist"
+
 	NSMutableDictionary* mainPreferenceDict = [[NSMutableDictionary alloc] initWithContentsOfFile:GREEN_PASS_PLIST];
 	isEnabled = [mainPreferenceDict objectForKey:@"isEnabled"] ? [[mainPreferenceDict objectForKey:@"isEnabled"] boolValue] : YES;
 }
@@ -76,6 +79,7 @@ UIImageView* gpMainImageView;
 	UIImage* bgImage = [UIImage imageWithData:data];
 	UIImage* imageResized = [self scaleImage:bgImage toSize:CGSizeMake([[UIScreen mainScreen] bounds].size.width-30, [[UIScreen mainScreen] bounds].size.height-30)];
 	gpMainImageView = [[UIImageView alloc] initWithImage:imageResized];
+	//make this a class that init with imageview?
 	[self windowForPrompts];
 }
 
@@ -109,11 +113,28 @@ UIImageView* gpMainImageView;
     _alertWindow.windowLevel = UIWindowLevelAlert+1;
     _alertWindow.hidden = NO;
     _alertWindow.tintColor = [[WindowTouchRecognizerSubview valueForKey:@"keyWindow"] tintColor];
+	// ########button start
+	button = [UIButton buttonWithType:UIButtonTypeCustom];
+	//[button setTitle:@"NA" forState:UIControlStateNormal];
+	[button addTarget:self  action:@selector(buttonPressedAction:) forControlEvents:UIControlEventTouchUpInside];
+	button.frame = CGRectMake(0,0, 45,45);
+	button.center = _alertWindow.rootViewController.view.center;
+	button.frame = CGRectMake(button.frame.origin.x,_alertWindow.rootViewController.view.frame.size.height - 100, 45,45);
+	button.alpha = 0;
+	// ########### button end
+	//button.frame = CGRectMake(300, 300, 45, 45);
+	UIImage* swapIcon = [self scaleImage:[UIImage imageNamed:@"/Library/PreferenceBundles/GreenPassPrefs.bundle/swapiconalt.png"] toSize:CGSizeMake(45,45)];
+    [button setImage:swapIcon forState:UIControlStateNormal];
+	//need to fix the coordinates here as well. this is why they button is pressable only when inside the view
+	
+
 	gpMainImageView.alpha = 0;
+	
 	gpMainImageView.clipsToBounds = YES;
 	gpMainImageView.layer.cornerRadius = 15.0f;
 	gpMainImageView.frame = CGRectMake((_alertWindow.rootViewController.view.frame.size.width / 2) - (gpMainImageView.image.size.width / 2), (_alertWindow.rootViewController.view.frame.size.height / 2) - (gpMainImageView.image.size.height / 2), gpMainImageView.image.size.width, gpMainImageView.image.size.height);
 	[_alertWindow.rootViewController.view addSubview:gpMainImageView];
+	[_alertWindow.rootViewController.view addSubview:button];
 	[UIView animateWithDuration:0.3f
     	animations:^{
 				[UIView animateWithDuration:0.3f
@@ -121,6 +142,7 @@ UIImageView* gpMainImageView;
                     options:UIViewAnimationCurveLinear
                  animations:^{
 					gpMainImageView.alpha = 1;
+					button.alpha = 1;
                } completion:NULL];
     	} completion:^(BOOL finished) { 	}
 	];
@@ -135,11 +157,37 @@ UIImageView* gpMainImageView;
 	[gpMainImageView addGestureRecognizer:panGesture];
 	[gpMainImageView addGestureRecognizer:rotationGesture];
 	[gpMainImageView addGestureRecognizer:pinchGesture];
-
 	updateGlobalCords(gpMainImageView.frame.origin.x,gpMainImageView.frame.origin.x + gpMainImageView.frame.size.width,
 						gpMainImageView.frame.origin.y, gpMainImageView.frame.origin.y + gpMainImageView.frame.size.height);
 
+}
 
+//this works. need to add lock on the lockscreen so it wont turn off.
+%new
+/* Main contact button is pressed. will launch according to the settings the user chose */
+-(void)buttonPressedAction:(id)sender {    
+	NSLog(@"omriku pressed a button");
+	UIImagePickerController* imagePicker = [[UIImagePickerController alloc ] init];
+	//[imagePicker _setAllowsMultipleSelection:TRUE];
+	// Check if image access is authorized
+	if([UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary]) {
+		imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+		// Use delegate methods to get result of photo library -- Look up UIImagePicker delegate methods
+		imagePicker.delegate = (id)self;
+		[_alertWindow.rootViewController presentViewController:imagePicker animated:YES completion:nil];
+	}	
+}
+%new
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
+	NSLog(@"omriku image controller.");
+	UIImage *pickedImage = info[UIImagePickerControllerOriginalImage];
+	NSData *dataToStore = [NSData dataWithData:UIImageJPEGRepresentation(pickedImage,1.0)];	
+	NSLog(@"omriku image controller data %@",dataToStore);
+	NSUserDefaults* prefs = [[NSUserDefaults alloc] initWithSuiteName:GREEN_PASS_PLIST];
+	[prefs setObject:dataToStore forKey:@"backgroundImage"];	
+    [[NSUserDefaults standardUserDefaults] synchronize];
+	[picker dismissViewControllerAnimated:YES completion:nil];
+	[self activatorGP];
 }
 
 %new
@@ -152,6 +200,7 @@ UIImageView* gpMainImageView;
                     options:UIViewAnimationCurveLinear
                  animations:^{
 					gpMainImageView.alpha = 0;
+					button.alpha = 0;
                } completion:NULL];
     	} completion:^(BOOL finished) { 	}
 	];	
