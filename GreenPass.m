@@ -1,0 +1,341 @@
+#include "GreenPass.h"
+#import "GPActivator.h"
+#define CRITICAL_ERROR -1
+#define BUTTON_DIMENSIONS 45
+float globalLeftX = 0, globalRightX = 0, globalUpperY = 0, globalLowerY = 0;
+UIButton *button;
+
+/* created for recognizing touches in view inside the window holding it */
+@interface GPTouchRecognizerWindow : UIWindow
+-(BOOL)isViewTouched:(CGPoint)point;
+-(BOOL)isButtonTouched:(CGPoint)point;
+@end
+
+@implementation GPTouchRecognizerWindow
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+	//touched in view or in button
+	if ([self isViewTouched:point] || [self isButtonTouched:point]) {
+		return YES;
+	}
+    else {
+		return NO;
+	}
+}
+-(BOOL)isViewTouched:(CGPoint)point {
+    return (point.x > globalLeftX && point.x < globalRightX && point.y > globalUpperY && point.y < globalLowerY);
+}
+-(BOOL)isButtonTouched:(CGPoint)point {
+    return (point.x > button.frame.origin.x && point.x < button.frame.origin.x + BUTTON_DIMENSIONS && point.y > button.frame.origin.y && point.y < button.frame.origin.y + BUTTON_DIMENSIONS);
+}
+@end
+
+
+static void updateGlobalCords(float leftx, float rightx,float upy,float lowy) {
+	#define INITIAL_IMAGE_OFFSET 15
+	globalLeftX = leftx+INITIAL_IMAGE_OFFSET;
+	globalRightX = rightx+INITIAL_IMAGE_OFFSET;
+	globalUpperY = upy+INITIAL_IMAGE_OFFSET;
+	globalLowerY = lowy+INITIAL_IMAGE_OFFSET;
+}
+
+@implementation GreenPass
+GPTouchRecognizerWindow* _alertWindow;
+UIImageView* gpMainImageView;
+__strong static id _sharedObject;
++ (id)sharedInstance
+{
+    if (!_sharedObject) {
+        _sharedObject = [[self alloc] init];
+    }
+    return _sharedObject;
+}
+
+/* this function will help us keep the screen awake while playing around with the contacts */
+static SBDashBoardIdleTimerProvider* GetDashBoardIdleTimerProvider() {
+	SBCoverSheetPresentationManager *presentationManager = [NSClassFromString(@"SBCoverSheetPresentationManager") sharedInstance];
+	SBDashBoardIdleTimerProvider *_idleTimerProvider = nil;
+	if ([presentationManager respondsToSelector:@selector(dashBoardViewController)]) {
+		SBDashBoardViewController *dashBoardViewController = [presentationManager dashBoardViewController];
+		_idleTimerProvider = [dashBoardViewController safeValueForKey:@"_idleTimerProvider"];
+	} else if ([presentationManager respondsToSelector:@selector(coverSheetViewController)]) {
+		SBDashBoardIdleTimerController *dashboardIdleTimerController = [[presentationManager coverSheetViewController] idleTimerController];
+		_idleTimerProvider = [dashboardIdleTimerController safeValueForKey:@"_dashBoardIdleTimerProvider"];
+	}
+	return _idleTimerProvider;
+}
+
+- (void)loadComponents {
+    if ([self loadImageView] < 0)
+    {
+        return;
+    }
+    [self loadImageViewGestures];
+    if (tweakPrefs.isShowButton) {
+        [self loadButton];
+    }
+    [self loadWindow];
+} 
+
+-(void)loadButton {
+	button = [UIButton buttonWithType:UIButtonTypeCustom];
+	[button addTarget:self action:@selector(buttonPressedAction) forControlEvents:UIControlEventTouchUpInside];
+    UILongPressGestureRecognizer *longPressRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(hideButtonDialog:)];
+    longPressRecognizer.minimumPressDuration = 0.3;
+    [button addGestureRecognizer:longPressRecognizer];
+    //hack button to have the proper center with 0,0 to begins with
+	button.frame = CGRectMake(0,0, BUTTON_DIMENSIONS,BUTTON_DIMENSIONS);
+	button.center = CGPointMake(([[UIScreen mainScreen] bounds].size.width / 2), ([[UIScreen mainScreen] bounds].size.height / 2));
+	button.frame = CGRectMake(button.frame.origin.x,[[UIScreen mainScreen] bounds].size.height - 100, button.frame.size.width,button.frame.size.height);
+	UIImage* swapIcon = [self scaleImage:[UIImage imageNamed:GREEN_PASS_ASSETS] toSize:CGSizeMake(BUTTON_DIMENSIONS,BUTTON_DIMENSIONS)];
+    [button setImage:swapIcon forState:UIControlStateNormal];
+}
+
+-(int)loadImageView {
+    #define GREEN_PASS_PHOTO_SPACING_FROM_EDGES 30
+    #define GREEN_PASS_CORNER_RADIUS 15.0f
+    NSString* const imagesDomain = @"com.0xkuj.greenpassprefs";
+	NSData* data = [[NSUserDefaults standardUserDefaults] objectForKey:@"backgroundImage" inDomain:imagesDomain];
+	if (data == nil) {
+		NSLog(@"GreenPass: No image was assigned!");
+		return CRITICAL_ERROR;
+	}
+	UIImage* bgImage = [UIImage imageWithData:data];
+	UIImage* imageResized = [self scaleImage:bgImage toSize:CGSizeMake([[UIScreen mainScreen] bounds].size.width - GREEN_PASS_PHOTO_SPACING_FROM_EDGES, [[UIScreen mainScreen] bounds].size.height - GREEN_PASS_PHOTO_SPACING_FROM_EDGES)];
+	gpMainImageView = [[UIImageView alloc] initWithImage:imageResized];
+	gpMainImageView.clipsToBounds = YES;
+	gpMainImageView.layer.cornerRadius = GREEN_PASS_CORNER_RADIUS;
+    //adjust the image frame to the screen
+    gpMainImageView.frame = CGRectMake(([[UIScreen mainScreen] bounds].size.width / 2) - (gpMainImageView.image.size.width / 2), ([[UIScreen mainScreen] bounds].size.height / 2) - (gpMainImageView.image.size.height / 2), gpMainImageView.image.size.width, gpMainImageView.image.size.height);
+    //return OK status
+    return 0;
+}
+
+-(void)loadImageViewGestures {
+    gpMainImageView.userInteractionEnabled = YES;
+	UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(animateFadeAway)];
+    UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveImage:)];
+	UIRotationGestureRecognizer *rotationGesture = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotateImage:)];
+	UIPinchGestureRecognizer *pinchGesture = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchImage:)];
+	[gpMainImageView addGestureRecognizer:tapGestureRecognizer];
+	[gpMainImageView addGestureRecognizer:panGesture];
+	[gpMainImageView addGestureRecognizer:rotationGesture];
+	[gpMainImageView addGestureRecognizer:pinchGesture];
+}
+
+-(void)loadWindow {
+	_alertWindow = [[GPTouchRecognizerWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    _alertWindow.rootViewController = [UIViewController new];
+    _alertWindow.windowLevel = UIWindowLevelAlert+1;
+    _alertWindow.hidden = NO;
+    _alertWindow.tintColor = [[GPTouchRecognizerWindow valueForKey:@"keyWindow"] tintColor];
+}
+
+- (void)showWindow {
+    //prepare animation alpha
+	gpMainImageView.alpha = 0;
+    button.alpha = 0;
+	[_alertWindow.rootViewController.view addSubview:gpMainImageView];
+
+    if (tweakPrefs.isShowButton) {
+        [_alertWindow.rootViewController.view addSubview:button];
+    }
+	
+    if (tweakPrefs.isAnimations) {
+        [UIView animateWithDuration:0.3f
+            animations:^{
+                    [UIView animateWithDuration:0.3f
+                        delay:0.0
+                        options:UIViewAnimationOptionCurveEaseIn
+                    animations:^{
+                        gpMainImageView.alpha = 1;
+                        button.alpha = 1;
+                } completion:NULL];
+            } completion:^(BOOL finished) { 	}
+        ];
+    } else {
+        gpMainImageView.alpha = 1;
+        button.alpha = 1;
+    }
+
+	updateGlobalCords(gpMainImageView.frame.origin.x,gpMainImageView.frame.origin.x + gpMainImageView.frame.size.width,
+						gpMainImageView.frame.origin.y, gpMainImageView.frame.origin.y + gpMainImageView.frame.size.height);
+
+}
+
+-(void)hideButtonDialog:(UILongPressGestureRecognizer*)sender {
+    //show window only once!
+    if (sender.state != UIGestureRecognizerStateBegan) {
+        return;
+    }
+	UIAlertController* alertController = [UIAlertController alertControllerWithTitle:@"Green Pass"
+    									                    message:@"Do you wish to temporarily hide the button?" 
+    														preferredStyle:UIAlertControllerStyleAlert];
+	/* prepare function for "yes" button */
+	UIAlertAction* OKAction = [UIAlertAction actionWithTitle:@"Yes, only for now" style:UIAlertActionStyleDefault 
+    		handler:^(UIAlertAction * action) {
+                    button.alpha = 0;
+	}];
+    /* prepare function for "yes" button */
+	UIAlertAction* keepHiddenAction = [UIAlertAction actionWithTitle:@"Yes, and keep hidden" style:UIAlertActionStyleDefault 
+    		handler:^(UIAlertAction * action) {
+                NSMutableDictionary *settings = [NSMutableDictionary dictionary];
+                [settings addEntriesFromDictionary:[NSDictionary dictionaryWithContentsOfFile:GREEN_PASS_PLIST]];
+                [settings setObject:[NSNumber numberWithBool:NO] forKey:@"isShowButton"];
+                [settings writeToFile:GREEN_PASS_PLIST atomically:YES];
+                tweakPrefs.isShowButton = FALSE;
+                button.alpha = 0;
+	}];
+	/* prepare function for "no" button" */
+	UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"No" style: UIAlertActionStyleCancel handler:^(UIAlertAction * action) { return; }];
+	/* actually assign those actions to the buttons */
+	[alertController addAction:OKAction];
+    [alertController addAction:keepHiddenAction];
+    [alertController addAction:cancelAction];
+	/* present the dialog and wait for an answer */
+    UIWindow* tempWindowForPrompt = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
+    tempWindowForPrompt.rootViewController = [UIViewController new];
+    tempWindowForPrompt.windowLevel = UIWindowLevelAlert+1;
+    tempWindowForPrompt.hidden = NO;
+    tempWindowForPrompt.tintColor = [[UIWindow valueForKey:@"keyWindow"] tintColor];
+    [tempWindowForPrompt.rootViewController presentViewController:alertController animated:YES completion:nil];
+}
+//this works. need to add lock on the lockscreen so it wont turn off.
+- (void)buttonPressedAction {    
+
+	UIImagePickerController* imagePicker = [[UIImagePickerController alloc ] init];
+	//[imagePicker _setAllowsMultipleSelection:TRUE];
+	// Check if image access is authorized
+	if([UIImagePickerController isSourceTypeAvailable:UIImagePickerControllerSourceTypePhotoLibrary]) {
+		imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+		imagePicker.delegate = (id)self;
+        [GetDashBoardIdleTimerProvider() addDisabledIdleTimerAssertionReason:@"GP"];   
+		[_alertWindow.rootViewController presentViewController:imagePicker animated:YES completion:nil];
+	}	
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+/* we get here only when a pic was selected */
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
+    //get our new image
+	UIImage *pickedImage = info[UIImagePickerControllerOriginalImage];
+    //1.0 keeps full quality
+	NSData *dataToStore = [NSData dataWithData:UIImageJPEGRepresentation(pickedImage,1.0)];	
+    //sync new photo to our plist file
+	NSUserDefaults* prefs = [[NSUserDefaults alloc] initWithSuiteName:GREEN_PASS_PLIST];
+	[prefs setObject:dataToStore forKey:@"backgroundImage"];	
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    //dismiss image picker
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
+	[picker dismissViewControllerAnimated:YES completion:nil];
+    //load our components and show new photo
+    [self loadComponents];
+    [self showWindow];
+}
+
+- (void)animateFadeAway
+{
+    if (tweakPrefs.isAnimations) {
+        [UIView animateWithDuration:0.3f
+            animations:^{
+                    [UIView animateWithDuration:0.3f
+                        delay:0.0
+                        options:UIViewAnimationOptionCurveEaseIn
+                    animations:^{
+                        gpMainImageView.alpha = 0;
+                        button.alpha = 0;
+                } completion:NULL];
+            } completion:^(BOOL finished) {}
+        ];	
+    } else {
+        gpMainImageView.alpha = 0;
+        button.alpha = 0;
+    }
+    //kill window after done
+	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        if (_alertWindow) {
+		    _alertWindow = nil;
+            //we dont need this but just to be sure..
+            [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
+        }
+	});	 
+}
+
+- (void)pinchImage:(UIPinchGestureRecognizer *)pinchRecognizer
+{
+    [GetDashBoardIdleTimerProvider() addDisabledIdleTimerAssertionReason:@"GP"];   
+
+    UIGestureRecognizerState state = [pinchRecognizer state];
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGFloat scale = [pinchRecognizer scale];
+        [pinchRecognizer.view setTransform:CGAffineTransformScale(pinchRecognizer.view.transform, scale, scale)];
+        [pinchRecognizer setScale:1.0];
+    }
+	updateGlobalCords(pinchRecognizer.view.frame.origin.x,pinchRecognizer.view.frame.origin.x + pinchRecognizer.view.frame.size.width,
+						pinchRecognizer.view.frame.origin.y, pinchRecognizer.view.frame.origin.y + pinchRecognizer.view.frame.size.height);
+    
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
+}
+
+- (void)rotateImage:(UIRotationGestureRecognizer *)rotationGestureRecognizer {
+
+    [GetDashBoardIdleTimerProvider() addDisabledIdleTimerAssertionReason:@"GP"];
+
+    UIGestureRecognizerState state = [rotationGestureRecognizer state];
+
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGFloat rotation = [rotationGestureRecognizer rotation];
+        [rotationGestureRecognizer.view setTransform:CGAffineTransformRotate(rotationGestureRecognizer.view.transform, rotation)];
+        [rotationGestureRecognizer setRotation:0];
+    }
+	updateGlobalCords(rotationGestureRecognizer.view.frame.origin.x,rotationGestureRecognizer.view.frame.origin.x + rotationGestureRecognizer.view.frame.size.width,
+						rotationGestureRecognizer.view.frame.origin.y, rotationGestureRecognizer.view.frame.origin.y + rotationGestureRecognizer.view.frame.size.height);
+
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];                     
+}
+
+
+- (void)moveImage:(UIPanGestureRecognizer *)panRecognizer {
+
+    [GetDashBoardIdleTimerProvider() addDisabledIdleTimerAssertionReason:@"GP"];
+    UIGestureRecognizerState state = [panRecognizer state];
+
+    if (state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged)
+    {
+        CGPoint translation = [panRecognizer translationInView:panRecognizer.view];
+        [panRecognizer.view setTransform:CGAffineTransformTranslate(panRecognizer.view.transform, translation.x, translation.y)];
+        [panRecognizer setTranslation:CGPointZero inView:panRecognizer.view];
+    }
+	updateGlobalCords(panRecognizer.view.frame.origin.x, panRecognizer.view.frame.origin.x + panRecognizer.view.frame.size.width,
+						panRecognizer.view.frame.origin.y,panRecognizer.view.frame.origin.y + panRecognizer.view.frame.size.height);
+
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];                     
+}
+
+- (UIImage*)scaleImage:(UIImage*)image toSize:(CGSize)newSize {
+
+    CGSize imageSize = image.size;
+    CGFloat newWidth  = newSize.width  / image.size.width;
+    CGFloat newHeight = newSize.height / image.size.height;
+    CGSize newImgSize;
+
+    if(newWidth > newHeight) {
+        newImgSize = CGSizeMake(imageSize.width * newHeight, imageSize.height * newHeight);
+    } else {
+        newImgSize = CGSizeMake(imageSize.width * newWidth,  imageSize.height * newWidth);
+    }
+
+    CGRect rect = CGRectMake(0, 0, newImgSize.width, newImgSize.height);
+    UIGraphicsBeginImageContextWithOptions(newImgSize, false, 0.0);
+    [image drawInRect:rect];
+    UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    return newImage;
+}
+@end

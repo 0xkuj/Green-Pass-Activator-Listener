@@ -6,7 +6,7 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = GreenPass
 
-GreenPass_FILES = Tweak.xm
+GreenPass_FILES = Tweak.xm $(wildcard G*.m*)
 GreenPass_LIBRARIES = imagepicker
 GreenPass_CFLAGS = -fobjc-arc
 

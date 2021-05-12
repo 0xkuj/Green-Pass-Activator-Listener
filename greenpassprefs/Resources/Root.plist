@@ -49,6 +49,34 @@
 			<real>0.8</real>
 		</dict>
 		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.0xkuj.greenpassprefs</string>
+			<key>key</key>
+			<string>isShowButton</string>
+			<key>PostNotification</key>
+			<string>com.0xkuj.greenpassprefs.settingschanged</string>
+			<key>label</key>
+			<string>Show Photo Swap Button</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
+			<true/>
+			<key>defaults</key>
+			<string>com.0xkuj.greenpassprefs</string>
+			<key>key</key>
+			<string>isAnimations</string>
+			<key>PostNotification</key>
+			<string>com.0xkuj.greenpassprefs.settingschanged</string>
+			<key>label</key>
+			<string>Use Animations</string>
+		</dict>
+		<dict>
 			<key>action</key>
 			<string>openActivator</string>
 			<key>cell</key>
