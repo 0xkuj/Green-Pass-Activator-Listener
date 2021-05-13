@@ -66,6 +66,20 @@
 			<key>cell</key>
 			<string>PSSwitchCell</string>
 			<key>default</key>
+			<false/>
+			<key>defaults</key>
+			<string>com.0xkuj.greenpassprefs</string>
+			<key>key</key>
+			<string>isLongPressOnPic</string>
+			<key>PostNotification</key>
+			<string>com.0xkuj.greenpassprefs.settingschanged</string>
+			<key>label</key>
+			<string>Long Press on Image for Picker</string>
+		</dict>
+		<dict>
+			<key>cell</key>
+			<string>PSSwitchCell</string>
+			<key>default</key>
 			<true/>
 			<key>defaults</key>
 			<string>com.0xkuj.greenpassprefs</string>

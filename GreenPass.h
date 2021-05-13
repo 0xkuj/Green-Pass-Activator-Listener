@@ -1,11 +1,12 @@
 
 
 #define GREEN_PASS_PLIST @"/var/mobile/Library/Preferences/com.0xkuj.greenpassprefs.plist"
-#define GREEN_PASS_ASSETS @"/Library/PreferenceBundles/GreenPassPrefs.bundle/swapiconalt.png"
+#define GREEN_PASS_ASSETS_SWAP_ICON @"/Library/PreferenceBundles/GreenPassPrefs.bundle/swapiconalt.png"
 
 struct viewPreferences {
    BOOL isShowButton;
    BOOL isAnimations;
+   BOOL isLongPressOnPic;
 } tweakPrefs;
 
 @interface NSUserDefaults ()
@@ -16,36 +17,34 @@ struct viewPreferences {
 -(id)safeValueForKey:(id)arg1;
 @end
 
-@interface SBDashBoardIdleTimerProvider : NSObject // iOS 11 - 13
--(void)addDisabledIdleTimerAssertionReason:(id)arg1; // iOS 11 - 13
--(void)removeDisabledIdleTimerAssertionReason:(id)arg1; // iOS 11 - 13
-// -(BOOL)isDisabledAssertionActiveForReason:(id)arg1; // iOS 11 - 13
-// -(void)resetIdleTimer; // iOS 11 - 13
+@interface SBDashBoardIdleTimerProvider : NSObject
+-(void)addDisabledIdleTimerAssertionReason:(id)arg1;
+-(void)removeDisabledIdleTimerAssertionReason:(id)arg1;
 @end
 
-@interface SBDashBoardViewController : UIViewController { // iOS 10 - 12
-	SBDashBoardIdleTimerProvider *_idleTimerProvider; // iOS 11 - 12
+@interface SBDashBoardViewController : UIViewController {
+	SBDashBoardIdleTimerProvider *_idleTimerProvider;
 }
 @end
 
-@interface SBDashBoardIdleTimerController : NSObject { // iOS 13
-	SBDashBoardIdleTimerProvider *_dashBoardIdleTimerProvider; // iOS 13
+@interface SBDashBoardIdleTimerController : NSObject {
+	SBDashBoardIdleTimerProvider *_dashBoardIdleTimerProvider;
 }
 @end
 
-@interface CSCoverSheetViewController : UIViewController // iOS 13
--(id)idleTimerController; // iOS 13
+@interface CSCoverSheetViewController : UIViewController
+-(id)idleTimerController;
 @end
 
-@interface SBCoverSheetPresentationManager : NSObject // iOS 11 - 13
-+(id)sharedInstance; // iOS 11 - 13
--(id)dashBoardViewController; // iOS 11 - 12
--(id)coverSheetViewController; // iOS 13
+@interface SBCoverSheetPresentationManager : NSObject
++(id)sharedInstance;
+-(id)dashBoardViewController;
+-(id)coverSheetViewController;
 @end
 
 @interface GreenPass : NSObject
 + (id)sharedInstance;
-- (void)loadComponents;
+- (int)loadComponents;
 - (void)showWindow;
 /* not needed to be declared */
 /*

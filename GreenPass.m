@@ -64,16 +64,18 @@ static SBDashBoardIdleTimerProvider* GetDashBoardIdleTimerProvider() {
 	return _idleTimerProvider;
 }
 
-- (void)loadComponents {
+- (int)loadComponents {
     if ([self loadImageView] < 0)
     {
-        return;
+        return CRITICAL_ERROR;
     }
     [self loadImageViewGestures];
     if (tweakPrefs.isShowButton) {
         [self loadButton];
     }
     [self loadWindow];
+    //means all ok
+    return 0;
 } 
 
 -(void)loadButton {
@@ -86,7 +88,7 @@ static SBDashBoardIdleTimerProvider* GetDashBoardIdleTimerProvider() {
 	button.frame = CGRectMake(0,0, BUTTON_DIMENSIONS,BUTTON_DIMENSIONS);
 	button.center = CGPointMake(([[UIScreen mainScreen] bounds].size.width / 2), ([[UIScreen mainScreen] bounds].size.height / 2));
 	button.frame = CGRectMake(button.frame.origin.x,[[UIScreen mainScreen] bounds].size.height - 100, button.frame.size.width,button.frame.size.height);
-	UIImage* swapIcon = [self scaleImage:[UIImage imageNamed:GREEN_PASS_ASSETS] toSize:CGSizeMake(BUTTON_DIMENSIONS,BUTTON_DIMENSIONS)];
+	UIImage* swapIcon = [self scaleImage:[UIImage imageNamed:GREEN_PASS_ASSETS_SWAP_ICON] toSize:CGSizeMake(BUTTON_DIMENSIONS,BUTTON_DIMENSIONS)];
     [button setImage:swapIcon forState:UIControlStateNormal];
 }
 
@@ -116,6 +118,13 @@ static SBDashBoardIdleTimerProvider* GetDashBoardIdleTimerProvider() {
     UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveImage:)];
 	UIRotationGestureRecognizer *rotationGesture = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotateImage:)];
 	UIPinchGestureRecognizer *pinchGesture = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(pinchImage:)];
+
+    if (tweakPrefs.isLongPressOnPic) {
+        UILongPressGestureRecognizer *longPressRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(buttonPressedAction)];
+        longPressRecognizer.minimumPressDuration = 0.3;
+        [gpMainImageView addGestureRecognizer:longPressRecognizer];
+    }
+
 	[gpMainImageView addGestureRecognizer:tapGestureRecognizer];
 	[gpMainImageView addGestureRecognizer:panGesture];
 	[gpMainImageView addGestureRecognizer:rotationGesture];
@@ -254,12 +263,12 @@ static SBDashBoardIdleTimerProvider* GetDashBoardIdleTimerProvider() {
         gpMainImageView.alpha = 0;
         button.alpha = 0;
     }
+    //we dont need this but just to be safe..   
+    [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
     //kill window after done
 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         if (_alertWindow) {
 		    _alertWindow = nil;
-            //we dont need this but just to be sure..
-            [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
         }
 	});	 
 }

@@ -15,6 +15,7 @@ static void loadPrefs() {
 	isEnabled = [mainPreferenceDict objectForKey:@"isEnabled"] ? [[mainPreferenceDict objectForKey:@"isEnabled"] boolValue] : YES;
 	tweakPrefs.isShowButton = [mainPreferenceDict objectForKey:@"isShowButton"] ? [[mainPreferenceDict objectForKey:@"isShowButton"] boolValue] : YES;
 	tweakPrefs.isAnimations = [mainPreferenceDict objectForKey:@"isAnimations"] ? [[mainPreferenceDict objectForKey:@"isAnimations"] boolValue] : YES;
+	tweakPrefs.isLongPressOnPic = [mainPreferenceDict objectForKey:@"isLongPressOnPic"] ? [[mainPreferenceDict objectForKey:@"isLongPressOnPic"] boolValue] : NO;
 }
 
 %hook SpringBoard
@@ -35,7 +36,11 @@ GreenPass *greenPassSharedInstance = nil;
 		return;
 
 	greenPassSharedInstance = [GreenPass sharedInstance];
-	[greenPassSharedInstance loadComponents];
+	//this means there was an error loading the components. maybe add reference to settings and not just fail. or at least display a message.
+	if ([greenPassSharedInstance loadComponents] < 0)
+	{
+		return;
+	}
 	[greenPassSharedInstance showWindow];
 }
 %end
