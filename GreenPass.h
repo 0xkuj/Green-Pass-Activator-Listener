@@ -7,6 +7,7 @@ struct viewPreferences {
    BOOL isShowButton;
    BOOL isAnimations;
    BOOL isLongPressOnPic;
+   BOOL isEnabled;
 } tweakPrefs;
 
 @interface NSUserDefaults ()
@@ -42,10 +43,27 @@ struct viewPreferences {
 -(id)coverSheetViewController;
 @end
 
-@interface GreenPass : NSObject
+@interface UIWindow ()
+-(void)setAutorotates:(BOOL)arg1;
+@end
+
+/* created for recognizing touches in view inside the window holding it */
+@interface GPTouchRecognizerWindow : UIWindow
+@end
+
+@interface GreenPass : NSObject {
+   GPTouchRecognizerWindow* _alertWindow;
+   UIImageView* gpMainImageView;
+   //those will help us calculate view dimensions
+   float leftXView, rigthXView, uppperYView, lowerYView;
+   //hold the button for the picture swap
+   UIButton *button;
+}
+@property (assign, nonatomic) BOOL isEnabled;
 + (id)sharedInstance;
 - (int)loadComponents;
 - (void)showWindow;
+- (BOOL)isTouched:(CGPoint)point;
 /* not needed to be declared */
 /*
 - (UIImage*) scaleImage:(UIImage*)image toSize:(CGSize)newSize;

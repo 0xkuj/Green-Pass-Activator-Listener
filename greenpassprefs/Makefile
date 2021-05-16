@@ -1,5 +1,5 @@
 ARCHS = arm64 arm64e
-export TARGET = iphone:clang:14.4:14.4
+export TARGET = iphone:clang:12.2:12.2
 include $(THEOS)/makefiles/common.mk
 
 BUNDLE_NAME = GreenPassPrefs
