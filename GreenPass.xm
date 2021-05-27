@@ -4,7 +4,7 @@
 
 @implementation GPTouchRecognizerWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
-    //touched in view or in button
+	//touched in view or in button
     GreenPass *greenPassSharedInstance = [GreenPass sharedInstance];
     return [greenPassSharedInstance isTouched:point] ? YES : NO;
 }
@@ -13,7 +13,7 @@
 
 /* Load preferences after change or after respring */
 static void loadPrefs() {
-    NSMutableDictionary* mainPreferenceDict = [[NSMutableDictionary alloc] initWithContentsOfFile:GREEN_PASS_PLIST];
+	NSMutableDictionary* mainPreferenceDict = [[NSMutableDictionary alloc] initWithContentsOfFile:GREEN_PASS_PLIST];
 	tweakPrefs.isEnabled = [mainPreferenceDict objectForKey:@"isEnabled"] ? [[mainPreferenceDict objectForKey:@"isEnabled"] boolValue] : YES;
 	tweakPrefs.isShowButton = [mainPreferenceDict objectForKey:@"isShowButton"] ? [[mainPreferenceDict objectForKey:@"isShowButton"] boolValue] : YES;
 	tweakPrefs.isAnimations = [mainPreferenceDict objectForKey:@"isAnimations"] ? [[mainPreferenceDict objectForKey:@"isAnimations"] boolValue] : YES;
@@ -102,6 +102,7 @@ __strong static id _sharedObject;
     _alertWindow.rootViewController = [UIViewController new];
     _alertWindow.windowLevel = UIWindowLevelAlert+1;
     _alertWindow.hidden = NO;
+    [_alertWindow _setSecure:YES];
     [_alertWindow setAutorotates:FALSE];
     _alertWindow.tintColor = [[GPTouchRecognizerWindow valueForKey:@"keyWindow"] tintColor];
 }

@@ -45,6 +45,7 @@ struct viewPreferences {
 
 @interface UIWindow ()
 -(void)setAutorotates:(BOOL)arg1;
+-(void)_setSecure:(BOOL)arg1;
 @end
 
 /* created for recognizing touches in view inside the window holding it */
