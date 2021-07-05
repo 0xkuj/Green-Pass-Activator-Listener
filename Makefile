@@ -6,8 +6,9 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = GreenPass
 
-GreenPass_FILES = $(wildcard G*.*m)
-GreenPass_LIBRARIES = imagepicker
+GreenPass_FILES = $(wildcard G*.*m)  UIImage+Gif.m
+GreenPass_LIBRARIES = imagepicker 
+GreenPass_FRAMEWORKS = UIKit Photos MobileCoreServices
 GreenPass_LDFLAGS = -lactivator
 GreenPass_CFLAGS = -fobjc-arc
 

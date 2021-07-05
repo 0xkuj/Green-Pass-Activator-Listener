@@ -54,12 +54,14 @@ struct viewPreferences {
 
 @interface GreenPass : NSObject {
    GPTouchRecognizerWindow* _alertWindow;
-   UIImageView* gpMainImageView;
+   //UIImageView* gpMainImageView;
    //those will help us calculate view dimensions
    float leftXView, rigthXView, uppperYView, lowerYView;
    //hold the button for the picture swap
    UIButton *button;
 }
+@property (nonatomic) IBOutlet UIImageView *gpMainImageView;
+@property (weak, nonatomic) IBOutlet UIImageView *imageView2;
 @property (assign, nonatomic) BOOL isEnabled;
 + (id)sharedInstance;
 - (int)loadComponents;

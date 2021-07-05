@@ -43,7 +43,7 @@
 			<string>com.0xkuj.greenpassprefs</string>
 			<key>key</key>
 			<string>backgroundImage</string>
-			<key>usesJPEG</key>
+			<key>usesGIF</key> <!-- defaults to false - set this to true to write gif data instead of png data when a gif is chosen (overriden by usesJPEG) -->
 			<true/>
 			<key>compressionQuality</key>
 			<real>0.8</real>
@@ -156,7 +156,7 @@
 			<key>cell</key>
 			<string>PSGroupCell</string>
 			<key>footerText</key>
-			<string>Made by: 0xkuj | v1.0.6</string>
+			<string>Made by: 0xkuj | v1.1</string>
 		</dict>
 	</array>
 	<key>title</key>

@@ -1,6 +1,16 @@
 #include "GreenPass.h"
+#import "UIImage+Gif.h"
 #define CRITICAL_ERROR -1
 #define BUTTON_DIMENSIONS 45
+
+@interface PHImageManager
+-(int)requestImageDataForAsset:(id)arg1 options:(id)arg2 resultHandler:(/*^block*/id)arg3 ;
++(id)defaultManager;
+@end
+
+@interface PHAsset
++(id)fetchAssetsWithALAssetURLs:(id)arg1 options:(id)arg2 ;
+@end
 
 @implementation GPTouchRecognizerWindow
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
@@ -58,6 +68,17 @@ __strong static id _sharedObject;
     [button setImage:swapIcon forState:UIControlStateNormal];
 }
 
+//Thanks to wl. from STO
+-(BOOL)isGifFromData:(NSData *)data {
+    uint8_t c;
+    [data getBytes:&c length:1];
+
+    if (c == 0x47) {
+        return YES;
+    }
+    return NO;
+}
+
 -(int)loadImageView {
     #define GREEN_PASS_PHOTO_SPACING_FROM_EDGES 30
     #define GREEN_PASS_CORNER_RADIUS 15.0f
@@ -67,19 +88,26 @@ __strong static id _sharedObject;
 		NSLog(@"GreenPass: No image was assigned!");
 		return CRITICAL_ERROR;
 	}
-	UIImage* bgImage = [UIImage imageWithData:data];
-	UIImage* imageResized = [self scaleImage:bgImage toSize:CGSizeMake([[UIScreen mainScreen] bounds].size.width - GREEN_PASS_PHOTO_SPACING_FROM_EDGES, [[UIScreen mainScreen] bounds].size.height - GREEN_PASS_PHOTO_SPACING_FROM_EDGES)];
-	gpMainImageView = [[UIImageView alloc] initWithImage:imageResized];
-	gpMainImageView.clipsToBounds = YES;
-	gpMainImageView.layer.cornerRadius = GREEN_PASS_CORNER_RADIUS;
+
+	UIImage* bgImage = [UIImage gifWithData:data]; 
+    /* if this is not a gif, resize. resizing makes the gif goes poof */
+    if (![self isGifFromData:data]) {
+	    UIImage* imageResized = [self scaleImage:bgImage toSize:CGSizeMake([[UIScreen mainScreen] bounds].size.width - GREEN_PASS_PHOTO_SPACING_FROM_EDGES, [[UIScreen mainScreen] bounds].size.height - GREEN_PASS_PHOTO_SPACING_FROM_EDGES)];
+	    self.gpMainImageView = [[UIImageView alloc] initWithImage:imageResized];
+    } else {
+        self.gpMainImageView = [[UIImageView alloc] initWithImage:bgImage];
+    }
+
+	self.gpMainImageView.clipsToBounds = YES;
+	self.gpMainImageView.layer.cornerRadius = GREEN_PASS_CORNER_RADIUS;
     //adjust the image frame to the screen
-    gpMainImageView.frame = CGRectMake(([[UIScreen mainScreen] bounds].size.width / 2) - (gpMainImageView.image.size.width / 2), ([[UIScreen mainScreen] bounds].size.height / 2) - (gpMainImageView.image.size.height / 2), gpMainImageView.image.size.width, gpMainImageView.image.size.height);
+    self.gpMainImageView.frame = CGRectMake(([[UIScreen mainScreen] bounds].size.width / 2) - (self.gpMainImageView.image.size.width / 2), ([[UIScreen mainScreen] bounds].size.height / 2) - (self.gpMainImageView.image.size.height / 2), self.gpMainImageView.image.size.width, self.gpMainImageView.image.size.height);
     //return OK status
     return 0;
 }
 
 -(void)loadImageViewGestures {
-    gpMainImageView.userInteractionEnabled = YES;
+    self.gpMainImageView.userInteractionEnabled = YES;
 	UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(animateFadeAway)];
     UIPanGestureRecognizer *panGesture = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(moveImage:)];
 	UIRotationGestureRecognizer *rotationGesture = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotateImage:)];
@@ -88,13 +116,13 @@ __strong static id _sharedObject;
     if (tweakPrefs.isLongPressOnPic) {
         UILongPressGestureRecognizer *longPressRecognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(buttonPressedAction)];
         longPressRecognizer.minimumPressDuration = 0.3;
-        [gpMainImageView addGestureRecognizer:longPressRecognizer];
+        [self.gpMainImageView addGestureRecognizer:longPressRecognizer];
     }
 
-	[gpMainImageView addGestureRecognizer:tapGestureRecognizer];
-	[gpMainImageView addGestureRecognizer:panGesture];
-	[gpMainImageView addGestureRecognizer:rotationGesture];
-	[gpMainImageView addGestureRecognizer:pinchGesture];
+	[self.gpMainImageView addGestureRecognizer:tapGestureRecognizer];
+	[self.gpMainImageView addGestureRecognizer:panGesture];
+	[self.gpMainImageView addGestureRecognizer:rotationGesture];
+	[self.gpMainImageView addGestureRecognizer:pinchGesture];
 }
 
 -(void)loadWindow {
@@ -109,9 +137,9 @@ __strong static id _sharedObject;
 
 - (void)showWindow {
     //prepare animation alpha
-	gpMainImageView.alpha = 0;
+	self.gpMainImageView.alpha = 0;
     button.alpha = 0;
-	[_alertWindow.rootViewController.view addSubview:gpMainImageView];
+	[_alertWindow.rootViewController.view addSubview:self.gpMainImageView];
 
     if (tweakPrefs.isShowButton) {
         [_alertWindow.rootViewController.view addSubview:button];
@@ -124,20 +152,20 @@ __strong static id _sharedObject;
                         delay:0.0
                         options:UIViewAnimationOptionCurveEaseIn
                     animations:^{
-                        gpMainImageView.alpha = 1;
+                        self.gpMainImageView.alpha = 1;
                         button.alpha = 1;
                 } completion:NULL];
             } completion:^(BOOL finished) { 	}
         ];
     } else {
-        gpMainImageView.alpha = 1;
+        self.gpMainImageView.alpha = 1;
         button.alpha = 1;
     }
 
-	//updateGlobalCords(gpMainImageView.frame.origin.x,gpMainImageView.frame.origin.x + gpMainImageView.frame.size.width,
-					//	gpMainImageView.frame.origin.y, gpMainImageView.frame.origin.y + gpMainImageView.frame.size.height);
-    [self updateGlobalCords:gpMainImageView.frame.origin.x RightX:gpMainImageView.frame.origin.x + gpMainImageView.frame.size.width
-                           UpperY:gpMainImageView.frame.origin.y LowerY:gpMainImageView.frame.origin.y + gpMainImageView.frame.size.height];
+	//updateGlobalCords(self.gpMainImageView.frame.origin.x,self.gpMainImageView.frame.origin.x + self.gpMainImageView.frame.size.width,
+					//	self.gpMainImageView.frame.origin.y, self.gpMainImageView.frame.origin.y + self.gpMainImageView.frame.size.height);
+    [self updateGlobalCords:self.gpMainImageView.frame.origin.x RightX:self.gpMainImageView.frame.origin.x + self.gpMainImageView.frame.size.width
+                           UpperY:self.gpMainImageView.frame.origin.y LowerY:self.gpMainImageView.frame.origin.y + self.gpMainImageView.frame.size.height];
 
 }
 
@@ -199,20 +227,33 @@ __strong static id _sharedObject;
 
 /* we get here only when a pic was selected */
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
-    //get our new image
-	UIImage *pickedImage = info[UIImagePickerControllerOriginalImage];
-    //1.0 keeps full quality
-	NSData *dataToStore = [NSData dataWithData:UIImageJPEGRepresentation(pickedImage,1.0)];	
-    //sync new photo to our plist file
-	NSUserDefaults* prefs = [[NSUserDefaults alloc] initWithSuiteName:GREEN_PASS_PLIST];
-	[prefs setObject:dataToStore forKey:@"backgroundImage"];	
-    [[NSUserDefaults standardUserDefaults] synchronize];
-    //dismiss image picker
+    //get our new image 
+    NSURL* refURL = [info objectForKey:@"UIImagePickerControllerReferenceURL"];
+    if (refURL) {
+        PHAsset* asset = [[PHAsset fetchAssetsWithALAssetURLs:@[refURL] options:nil] lastObject];
+		if (asset)
+		{
+			//user chose an image
+			[[PHImageManager defaultManager] requestImageDataForAsset:asset options:nil resultHandler:^(NSData * _Nullable data, NSString * _Nullable dataUTI, UIImageOrientation orientation, NSDictionary * _Nullable info)
+			{
+				if (data)
+				{
+                        NSUserDefaults* prefs = [[NSUserDefaults alloc] initWithSuiteName:GREEN_PASS_PLIST];
+                        [prefs setObject:data forKey:@"backgroundImage"];	
+                        [[NSUserDefaults standardUserDefaults] synchronize];
+					}
+				}];
+        }
+    }
     [GetDashBoardIdleTimerProvider() removeDisabledIdleTimerAssertionReason:@"GP"];
-	[picker dismissViewControllerAnimated:YES completion:nil];
-    //load our components and show new photo
-    [self loadComponents];
-    [self showWindow];
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.3 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+            //load our components and show new photo
+            [self loadComponents];
+            [self showWindow];
+	});	 
+
+    
 }
 
 - (void)animateFadeAway
@@ -224,13 +265,13 @@ __strong static id _sharedObject;
                         delay:0.0
                         options:UIViewAnimationOptionCurveEaseIn
                     animations:^{
-                        gpMainImageView.alpha = 0;
+                        self.gpMainImageView.alpha = 0;
                         button.alpha = 0;
                 } completion:NULL];
             } completion:^(BOOL finished) {}
         ];	
     } else {
-        gpMainImageView.alpha = 0;
+        self.gpMainImageView.alpha = 0;
         button.alpha = 0;
     }
     //we dont need this but just to be safe..   
